@@ -2,6 +2,7 @@ extern crate libc;
 
 use self::libc::{c_double, c_float, c_int, c_longlong, c_uint, c_void};
 use crate::array::Array;
+use crate::Dim4;
 use crate::defines::{AfError, HomographyType, MatchType};
 use crate::error::HANDLE_ERROR;
 use crate::util::{AfArray, DimT, Feat, MutAfArray, MutFeat};
@@ -419,20 +420,30 @@ where
     T: HasAfEnum + ImageFilterType,
     T::AggregateOutType: HasAfEnum,
 {
-    let mut idx: i64 = 0;
-    let mut dist: i64 = 0;
     unsafe {
+        // TODO(@kern): This seems to only return 1 row not matter what...
+        let mut idx = libc::malloc(mem::size_of::<Array::<u32>>()) as *mut Array::<u32>;
+        if idx.is_null() {
+            panic!("failed to allocate memory");
+        }
+
+        let mut dist = libc::malloc(mem::size_of::<Array::<T::AggregateOutType>>()) as *mut Array<T::AggregateOutType>;
+        if dist.is_null() {
+            panic!("failed to allocate memory");
+        }
+
         let err_val = af_hamming_matcher(
-            &mut idx as MutAfArray,
-            &mut dist as MutAfArray,
+            idx as *mut i64,
+            dist as *mut i64,
             query.get() as AfArray,
             train.get() as AfArray,
             dist_dims as DimT,
             n_dist as c_uint,
         );
         HANDLE_ERROR(AfError::from(err_val));
+
+        (idx.read(), dist.read())
     }
-    (idx.into(), dist.into())
 }
 
 /// Nearest Neighbour.
